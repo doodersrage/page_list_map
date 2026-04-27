@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<concrete5-cif version="1.0">
+    <attributesset handle="property" name="Property attributes" package="page_list_map">
+        <attributekey handle="property_address_str"/>
+        <attributekey handle="property_size"/>
+        <attributekey handle="property_sf_available"/>
+        <attributekey handle="property_type"/>
+        <attributekey handle="property_availability"/>
+    </attributesset>
+    <attributekeys>
+        <attributekey handle="property_address_str" name="Address" type="text" category="collection" package="page_list_map"/>
+    </attributekeys>
+    <attributekeys>
+        <attributekey handle="property_size" name="Size" type="text" category="collection" package="page_list_map"/>
+    </attributekeys>
+    <attributekeys>
+        <attributekey handle="property_sf_available" name="SF Available" type="text" category="collection" package="page_list_map"/>
+    </attributekeys>
+    <attributekeys>
+        <attributekey handle="property_type" name="Type" type="select" category="collection" package="page_list_map">
+            <attributekeyoption value="Build to Suit - Flex Warehouse"/>
+            <attributekeyoption value="Storage Only"/>
+            <attributekeyoption value="Office"/>
+            <attributekeyoption value="Residential/Commercial"/>
+            <attributekeyoption value="Office/Industrial"/>
+            <attributekeyoption value="Storage"/>
+            <attributekeyoption value="Retail"/>
+            <attributekeyoption value="Flex: Office/Warehouse"/>
+            <attributekeyoption value="Office/Warehouse"/>
+            <attributekeyoption value="Office/Warehouse"/>
+            <attributekeyoption value="Flex/Automotive"/>
+            <attributekeyoption value="Retail/Office/Industrial"/>
+            <attributekeyoption value="Warehouse"/>
+            <attributekeyoption value="Variety: Flex, Storage Only, and Yard Space"/>
+    </attributekeys>
+    <attributekeys>
+        <attributekey handle="property_availability" name="Availability" type="select" category="collection" package="page_list_map">
+            <attributekeyoption value=""/>
+            <attributekeyoption value="For Lease"/>
+            <attributekeyoption value="For Sale"/>
+    </attributekeys>
+</concrete5-cif>
