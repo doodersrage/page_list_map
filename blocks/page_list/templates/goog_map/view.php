@@ -52,9 +52,16 @@ class PageListMap {
         this.filterAvailArray = [];
         this.selectedMarker = null;
         this.geocodePromises = {};
-        this.geocoder = '';
-        this.AdvancedMarkerElement = '';
-        this.pinView = '';
+        this.geocoder = null;
+        this.AdvancedMarkerElement = null;
+        this.pinView = null;
+        this.mapElement = null;
+        this.innerMap = null;
+        
+        // Cache DOM elements
+        this.$propertyTypeFilter = null;
+        this.$propertyAvailFilter = null;
+        this.$descViews = null;
 
         this.initMap();
     }
@@ -78,6 +85,11 @@ class PageListMap {
         this.mapElement = $(`#MAP_ID_${this.mapId}`)[0];
         this.innerMap = this.mapElement.innerMap;
         this.innerMap.setOptions({ mapTypeControl: false });
+
+        // Cache DOM elements
+        this.$propertyTypeFilter = $('#property_type_filter');
+        this.$propertyAvailFilter = $('#property_availability_filter');
+        this.$descViews = $('.desc-view');
 
         this.attachEvents();
 
@@ -230,23 +242,29 @@ class PageListMap {
         });
 
         marker.addListener('click', () => {
-        if (this.selectedMarker) {
-            this.selectedMarker.map = null;
-        }
-        $('.desc-view').removeClass('highlight');
+        this.clearSelectedMarker();
+        this.$descViews.removeClass('highlight');
         this.scrollToAnchor('desc-view-' + pageID);
         $(`#desc-view-${pageID}`).addClass('highlight');
+        this.createHighlightMarker(latLng);
+        });
 
+        this.markers[pageID] = marker;
+    }
+
+    createHighlightMarker(latLng) {
         const highlightMarker = new this.AdvancedMarkerElement({
             position: latLng,
             map: this.innerMap,
             content: this.pinView.element
         });
-
         this.selectedMarker = highlightMarker;
-        });
+    }
 
-        this.markers[pageID] = marker;
+    clearSelectedMarker() {
+        if (this.selectedMarker) {
+            this.selectedMarker.map = null;
+        }
     }
 
     updateFilterArrays(prop_type, pageID) {
@@ -267,49 +285,32 @@ class PageListMap {
         this.markers.forEach((marker) => {
         marker.map = map;
         });
-        $('.desc-view').show();
     }
 
-    hideMarkers() {
+    hideAllMarkers() {
         this.setMapOnAll(null);
-        $('.desc-view').hide();
+        this.$descViews.hide();
     }
 
-    showMarkers() {
+    showAllMarkers() {
         this.setMapOnAll(this.innerMap);
-        $('.desc-view').show();
+        this.$descViews.show();
     }
 
     attachEvents() {
-        $('#property_type_filter').on('change', () => {
-        this.filterAllThings();
-        });
-        $('#property_availability_filter').on('change', () => {
-        this.filterAllThings();
-        });
+        this.$propertyTypeFilter.on('change', () => this.filterAllThings());
+        this.$propertyAvailFilter.on('change', () => this.filterAllThings());
 
-        $('.desc-view').mouseenter((event) => {
-        const pageID = $(event.currentTarget).data('page-id');
-        const marker = this.markers[pageID];
+        this.$descViews.on('mouseenter', (event) => {
+            const pageID = $(event.currentTarget).data('page-id');
+            const marker = this.markers[pageID];
 
-        if (this.selectedMarker) {
-            this.selectedMarker.map = null;
-        }
-
-        $(`#desc-view-${pageID}`).addClass('highlight');
-
-        const markerNew = new this.AdvancedMarkerElement({
-            position: marker.position,
-            map: this.innerMap,
-            content: this.pinView.element
-        });
-
-        this.selectedMarker = markerNew;
-        }).mouseleave(() => {
-        if (this.selectedMarker) {
-            this.selectedMarker.map = null;
-        }
-        $('.desc-view').removeClass('highlight');
+            this.clearSelectedMarker();
+            $(`#desc-view-${pageID}`).addClass('highlight');
+            this.createHighlightMarker(marker.position);
+        }).on('mouseleave', () => {
+            this.clearSelectedMarker();
+            this.$descViews.removeClass('highlight');
         });
     }
 
@@ -328,44 +329,36 @@ class PageListMap {
     }
 
     filterAllThings() {
-        const selectedType = $('#property_type_filter').val();
-        const selectedAvail = $('#property_availability_filter').val();
-        let typeMarkers = [];
-        let valueMarkers = [];
+        const selectedType = this.$propertyTypeFilter.val();
+        const selectedAvail = this.$propertyAvailFilter.val();
 
-        this.hideMarkers();
-        $('.desc-view').removeClass('highlight');
-        if (this.selectedMarker) {
-        this.selectedMarker.map = null;
-        }
+        this.hideAllMarkers();
+        this.$descViews.removeClass('highlight');
+        this.clearSelectedMarker();
 
         if (selectedType === '' && selectedAvail === '') {
-        this.showMarkers();
+        this.showAllMarkers();
         return;
         }
 
         if (selectedType !== '' && selectedAvail !== '') {
-        typeMarkers = this.filterByType(selectedType);
-        valueMarkers = this.filterByAvailability(selectedAvail);
+        const typeMarkers = this.filterByType(selectedType);
+        const valueMarkers = this.filterByAvailability(selectedAvail);
         const commonValues = typeMarkers.filter(item => valueMarkers.includes(item));
-        commonValues.forEach((item) => {
+        this.displayMarkers(commonValues);
+        } else {
+        const itemsToShow = selectedType !== '' 
+            ? this.filterByType(selectedType) 
+            : this.filterByAvailability(selectedAvail);
+        this.displayMarkers(itemsToShow);
+        }
+    }
+
+    displayMarkers(pageIDs) {
+        pageIDs.forEach((item) => {
             this.markers[item].map = this.innerMap;
             $(`#desc-view-${item}`).show();
         });
-        } else {
-        if (selectedType !== '') {
-            this.filterByType(selectedType).forEach((item) => {
-            this.markers[item].map = this.innerMap;
-            $(`#desc-view-${item}`).show();
-            });
-        }
-        if (selectedAvail !== '') {
-            this.filterByAvailability(selectedAvail).forEach((item) => {
-            this.markers[item].map = this.innerMap;
-            $(`#desc-view-${item}`).show();
-            });
-        }
-        }
     }
 
     scrollToAnchor(contID) {
