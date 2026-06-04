@@ -46,12 +46,10 @@ $filter_availability_options .= '</select>';
 $(document).ready(function(){
 
   async function initMap() {
-    let markers = [],
-        contentString = [],
-        infowindow = [],
-        filterArray = [],
-        filterAvailArray = [],
-        selectedMarkers;
+    const markers = [];
+    const filterArray = [];
+    const filterAvailArray = [];
+    let selectedMarkers;
 
     //  Request the needed libraries.
     const [{ Map }, { AdvancedMarkerElement }] = await Promise.all([
@@ -67,7 +65,7 @@ $(document).ready(function(){
         mapTypeControl: false,
     });
     // Add a marker positioned at the map center (Uluru).
-    geocoder = new google.maps.Geocoder();
+    const geocoder = new google.maps.Geocoder();
 
     const svgMarker = {
         path: "M-1.547 12l6.563-6.609-1.406-1.406-5.156 5.203-2.063-2.109-1.406 1.406zM0 0q2.906 0 4.945 2.039t2.039 4.945q0 1.453-0.727 3.328t-1.758 3.516-2.039 3.070-1.711 2.273l-0.75 0.797q-0.281-0.328-0.75-0.867t-1.688-2.156-2.133-3.141-1.664-3.445-0.75-3.375q0-2.906 2.039-4.945t4.945-2.039z",
@@ -79,70 +77,94 @@ $(document).ready(function(){
         anchor: new google.maps.Point(0, 20),
     };
 
+    const geocodePromises = {};
+
+    function parseCachedCoords(cached) {
+        if (typeof cached === 'string') {
+            try {
+                cached = JSON.parse(cached);
+            } catch (e) {
+                return null;
+            }
+        }
+        if (Array.isArray(cached) && cached.length > 0 && cached[0].geometry && cached[0].geometry.location) {
+            return {lat: cached[0].geometry.location.lat, lng: cached[0].geometry.location.lng};
+        }
+        return null;
+    }
+
     // convert address to lat lng and set marker
     function codeAddress(address, pageID) {
         let coords = localStorage.getItem(address+'Coords');
 
-        // check if values have already been stored for the address, if so use those instead of making another geocode request
-        if(coords){
-            coords = JSON.parse(coords);
-            let latLng = {lat: coords[0].geometry.location.lat, lng: coords[0].geometry.location.lng};
-            setMarker(address, pageID, latLng);
-        } else {
-
-            // first check local cache, if not found then geocode
-            fetch('/api/cached-data/'+address+'Coords', {
-                method: 'POST',
-                body: JSON.stringify({ content: "" })
-            }).then(response => {
-                if (!response.ok) {
-                    geocodeAddress(address, pageID);
-                    throw new Error('HTTP error'); // Manual check for HTTP errors (404, 500)
-                }
-                return response.json(); // Parses the response body as JSON
-            }).then(data => {
-                coords = data.content;
-                if(coords && coords.length > 0){
-                    let latLng = {lat: coords[0].geometry.location.lat, lng: coords[0].geometry.location.lng};
-                    setMarker(address, pageID, latLng);
-                } else {
-                    geocodeAddress(address, pageID);
-                }
-                
-            }).catch(error => {
-                geocodeAddress(address, pageID);
-                console.error('Fetch error:', error)}
-            ); 
-
+        if (coords) {
+            const latLng = parseCachedCoords(coords);
+            if (latLng) {
+                setMarker(address, pageID, latLng);
+                return;
+            }
         }
+
+        if (!geocodePromises[address]) {
+            geocodePromises[address] = fetch('/api/cached-data/'+encodeURIComponent(address)+'Coords', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: "" })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return Promise.reject(new Error('HTTP error'));
+                }
+                return response.json();
+            })
+            .then(data => {
+                const cachedLatLng = parseCachedCoords(data.content);
+                if (cachedLatLng) {
+                    return cachedLatLng;
+                }
+                return geocodeAddress(address);
+            })
+            .catch(error => {
+                delete geocodePromises[address];
+                console.error('Fetch error:', error);
+                return geocodeAddress(address);
+            });
+        }
+
+        geocodePromises[address]
+            .then(latLng => {
+                if (latLng) {
+                    setMarker(address, pageID, latLng);
+                }
+            })
+            .catch(error => console.error('Geocode error:', error));
     }
 
-    function geocodeAddress(address, pageID) {
-        geocoder.geocode({ 'address': address }, function (results, status) {
+    function geocodeAddress(address) {
+        return new Promise((resolve, reject) => {
+            geocoder.geocode({ address: address }, function (results, status) {
+                if (status === 'OK' && results && results[0]) {
+                    const latLng = { lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() };
 
-            var latLng = {lat: results[0].geometry.location.lat (), lng: results[0].geometry.location.lng ()};
-            
-            if (status == 'OK') {
+                    localStorage.setItem(address+'Coords', JSON.stringify(results));
 
-                // store geocode results in local cache for future use
-                localStorage.setItem(address+'Coords', JSON.stringify(results));
+                    fetch('/api/cached-data/'+encodeURIComponent(address)+'Coords', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: JSON.stringify(results) })
+                    }).then(response => {
+                        if (!response.ok) {
+                            throw new Error('HTTP error');
+                        }
+                        return response.json();
+                    }).catch(error => console.error('Fetch error:', error));
 
-                // store results to server for future use and to reduce number of geocode requests (which can be costly if there are a lot of properties)
-                fetch('/api/cached-data/'+address+'Coords', {
-                    method: 'POST',
-                    body: JSON.stringify({ content: JSON.stringify(results) })
-                }).then(response => {
-                    if (!response.ok) {
-                        throw new Error('HTTP error'); // Manual check for HTTP errors (404, 500)
-                    }
-                    return response.json(); // Parses the response body as JSON
-                }).catch(error => console.error('Fetch error:', error)); 
-
-                setMarker(address, pageID, latLng);
-
-            } else {
-                alert('Geocode was not successful for the following reason: ' + status);
-            }
+                    resolve(latLng);
+                } else {
+                    console.warn('Geocode was not successful for the following reason:', status);
+                    reject(status);
+                }
+            });
         });
     }
 
@@ -154,21 +176,20 @@ $(document).ready(function(){
             map: innerMap
         });
         marker.addListener("click", () => {
-            if(typeof selectedMarkers === 'object' && selectedMarkers !== null){
+            if (selectedMarkers) {
                 selectedMarkers.setMap(null);
             }
             $('.desc-view').removeClass('highlight');
-            scrollToAnchor('desc-view-' + pageID)
+            scrollToAnchor('desc-view-' + pageID);
             $('#desc-view-' + pageID).addClass('highlight');
 
-            var marker = new google.maps.Marker({
+            const highlightMarker = new google.maps.Marker({
                 position: latLng,
                 map: innerMap,
                 icon: svgMarker
             });
 
-            selectedMarkers = marker;
-
+            selectedMarkers = highlightMarker;
         });
 
         markers[pageID] = (marker);
