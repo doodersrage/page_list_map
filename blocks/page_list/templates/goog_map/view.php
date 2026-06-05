@@ -49,8 +49,11 @@ $filter_availability_options .= '</select>';
 $(document).ready(function(){
   const pageListMap<?php echo $c->getCollectionID(); ?> = new PageListMap(<?php echo $c->getCollectionID(); ?>);
 
-  delayMapMarkers(500).then(() => {
   <?php 
+  $filterArray = array();
+  $filterAvailArray = array();
+  $codeAddressArray = array();
+
   foreach ($pages as $page){
     $title = $th->entities($page->getCollectionName());
     $url = $nh->getLinkToCollection($page);
@@ -93,15 +96,15 @@ $(document).ready(function(){
             '</div>' .
             '</div>';
             
-            ?>
-        pageListMap<?php echo $c->getCollectionID(); ?>.updateFilterArrays('<?php echo addslashes($property_type); ?>', <?php echo $page->getCollectionID(); ?>);
-        pageListMap<?php echo $c->getCollectionID(); ?>.updateFilterAvailArrays('<?php echo addslashes($property_availability); ?>', <?php echo $page->getCollectionID(); ?>);
-        pageListMap<?php echo $c->getCollectionID(); ?>.codeAddress('<?php echo addslashes($property_address_str); ?>', <?php echo $page->getCollectionID(); ?>);
-        <?php
+            $filterArray[] = [addslashes($property_type), $page->getCollectionID()];
+            $filterAvailArray[] = [addslashes($property_availability), $page->getCollectionID()];
+            $codeAddressArray[] = [addslashes($property_address_str), $page->getCollectionID()];
 
         }
-    } ?>
-  });
+    } 
+    echo "pageListMap" . $c->getCollectionID() . ".filterArray = " . json_encode($filterArray) . ";\n";
+    echo "pageListMap" . $c->getCollectionID() . ".filterAvailArray = " . json_encode($filterAvailArray) . ";\n";
+    echo "pageListMap" . $c->getCollectionID() . ".codeAddressArray = " . json_encode($codeAddressArray) . ";\n";?>
 });
 </script>
 <div class="map-wrapper">
